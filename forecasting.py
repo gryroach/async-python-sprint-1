@@ -11,16 +11,18 @@ from tasks import (
     DataAnalyzingTask,
 )
 from utils import CITIES
-
+import datetime
 
 def forecast_weather():
     """
-    Анализ погодных условий по городам
+    Анализ погодных условий по городам@
     """
-    # city_name = "MOSCOW"
-    # ywAPI = YandexWeatherAPI()
-    # resp = ywAPI.get_forecasting(city_name)
-    pass
+    data = DataFetchingTask().start_thread()
+    n = datetime.datetime.now()
+    result = DataAggregationTask().aggregate_data()
+    print(result)
+    DataAnalyzingTask(result).set_rating_for_city()
+    print('-->', datetime.datetime.now() - n)
 
 
 if __name__ == "__main__":
