@@ -20,8 +20,7 @@ def forecast_weather():
     data = DataFetchingTask().start_thread()
     n = datetime.datetime.now()
     result = DataAggregationTask().aggregate_data()
-    print(result)
-    DataAnalyzingTask(result).set_rating_for_city()
+    r = DataAnalyzingTask(result).analyze_data()
     print('-->', datetime.datetime.now() - n)
 
 
