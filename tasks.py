@@ -1,38 +1,52 @@
 import datetime
+import logging
 import csv
 
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
+from typing import Dict, List, Tuple
 
 from api_client import YandexWeatherAPI
-from utils import CITIES, HOURS_RANGE, GOOD_CONDITIONS, CITIES_DESCRIPTION_MAP
+from utils import (
+    CITIES, HOURS_RANGE, GOOD_CONDITIONS, CITIES_DESCRIPTION_MAP, CSV_FILE_PATH
+)
 
 
 class DataFetchingTask:
-    def start_thread(self):
+    def start_threads(self) -> List[Tuple[str, Dict]]:
+        """Return city name and raw data from YandexWeatherAPI"""
         with ThreadPoolExecutor(max_workers=8) as pool:
             data_generator = pool.map(
-                self.get_data, CITIES.keys(), chunksize=2
+                self.get_data, CITIES.keys(), chunksize=4
             )
-            raw_data = [i for i in data_generator]
-        return raw_data
+        return list(data_generator)
 
     @staticmethod
-    def get_data(city: str):
-        return city, YandexWeatherAPI().get_forecasting(city)
+    def get_data(city: str) -> Tuple[str, Dict]:
+        try:
+            return city, YandexWeatherAPI().get_forecasting(city)
+        except Exception as er:
+            logging.error(
+                f'Ошибка при получении данных погоды для города {city}: {er}'
+            )
 
 
 class DataCalculationTask:
-    def __init__(self, raw_data) -> None:
+    def __init__(self, raw_data: List[Tuple[str, Dict]]) -> None:
         self.raw_data = raw_data
 
     def calculate_data(self):
+        """Обработать данные погоды для всех городов"""
         with Pool(processes=4) as pool:
-            poll_map_iterator = pool.map(self.get_forecasts, self.raw_data)
+            poll_map_iterator = pool.map(self.get_forecast_data, self.raw_data)
         return list(poll_map_iterator)
 
     @staticmethod
     def get_data_per_day(forecast_day_hours: list):
+        """
+        Получить среднее значение температуры и количество часов погоды
+        без осадков за день
+        """
         average_temp = 0
         temp_count = 0
         good_condition_hours = 0
@@ -48,7 +62,11 @@ class DataCalculationTask:
         return None, None
 
     @staticmethod
-    def get_average_city_data(city_data):
+    def get_average_city_data(
+            city_data: Dict[str, Tuple[int, int]]) -> Tuple[int, int]:
+        """
+        Получить средние значения температуры и часов без осадков за весь период
+        """
         good_conditions_days = 0
         average_temp = 0
         for day in city_data.values():
@@ -58,7 +76,12 @@ class DataCalculationTask:
         average_temp = int(round(average_temp, 0))
         return average_temp, good_conditions_days
 
-    def get_forecasts(self, raw_data: dict) -> dict:
+    def get_forecast_data(self, raw_data: Tuple[str, Dict]) -> dict:
+        """
+        Получить среднее значение температуры и количество часов погоды
+        без осадков для города за каждый день, а также средние
+        значения этих характеристик за весь период
+        """
         forecasts_data = {
             'city': raw_data[0],
             'data': dict()
@@ -80,27 +103,31 @@ class DataCalculationTask:
 
 
 class DataAggregationTask:
-    def aggregate_data(self):
-        raw_data = DataFetchingTask().start_thread()
+    def aggregate_data(self) -> List[Dict]:
+        """Получить данные и обработать их"""
+        raw_data = DataFetchingTask().start_threads()
         forecasts_data = DataCalculationTask(raw_data).calculate_data()
         return self.replace_city_name(forecasts_data)
 
     @staticmethod
-    def replace_city_name(data):
+    def replace_city_name(data: List[Dict]) -> List[Dict]:
+        """Заменить названия городов в соответствии с настройками"""
         for forecast in data:
             forecast['city'] = CITIES_DESCRIPTION_MAP[forecast['city']]
         return data
 
 
 class DataAnalyzingTask:
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         self.data = data
 
     def analyze_data(self):
+        """Провести анализ погоды в городах и записать данные в csv-файл"""
         self.set_rating_for_city()
         self.create_csv_file()
 
-    def set_rating_for_city(self):
+    def set_rating_for_city(self) -> None:
+        """Добавить данные рейтинга городов"""
         intermediate_data = []
         for city in self.data:
             average_temp = city['data']['Среднее'][0]
@@ -114,15 +141,20 @@ class DataAnalyzingTask:
 
     @staticmethod
     def compute_rating(summary_data: list) -> dict:
+        """Составить рейтинг городов"""
         sorted_list = sorted(
             summary_data, key=lambda x: (x[1], x[2]), reverse=True
         )
         rating = {city[0]: grade+1 for grade, city in enumerate(sorted_list)}
         return rating
 
-    def create_csv_file(self):
+    def create_csv_file(self) -> None:
+        """
+        Создать csv-файл с данными о температуре, часах без осадков
+        и рейтинге городов
+        """
         head = self.get_csv_head()
-        with open('result.csv', 'w') as csv_file:
+        with open(CSV_FILE_PATH, 'w') as csv_file:
             writer = csv.DictWriter(csv_file, delimiter=',', fieldnames=head)
             writer.writerow({column: column for column in head})
             for city in self.data:
@@ -147,7 +179,8 @@ class DataAnalyzingTask:
                 writer.writerow(temp_row)
                 writer.writerow(condition_row)
 
-    def get_csv_head(self):
+    def get_csv_head(self) -> List[str]:
+        """Получить шапку для csv-файла"""
         head = ['Город/день', '']
         max_count_date = 0
         index = 0
@@ -155,7 +188,6 @@ class DataAnalyzingTask:
             if len(city_data['data']) > max_count_date:
                 max_count_date = len(city_data['data'])
                 index = i
-
         for column_name in self.data[index]['data'].keys():
             head.append(column_name)
         return head
