@@ -15,10 +15,34 @@ CITIES = {
     "ROMA": "https://code.s3.yandex.net/async-module/roma-response.json",
     "CAIRO": "https://code.s3.yandex.net/async-module/cairo-response.json",
 }
+
+CITIES_DESCRIPTION_MAP = {
+    'MOSCOW': 'Москва',
+    'PARIS': 'Париж',
+    'LONDON': 'Лондон',
+    'BERLIN': 'Берлин',
+    'BEIJING': 'Пекин',
+    'KAZAN': 'Казань',
+    'SPETERSBURG': 'Санкт-Петербург',
+    'VOLGOGRAD': 'Волгоград',
+    'NOVOSIBIRSK': 'Новосибирск',
+    'KALININGRAD': 'Калининград',
+    'ABUDHABI': 'Абу-Даби',
+    'WARSZAWA': 'Варшава',
+    'BUCHAREST': 'Бухарест',
+    'ROMA': 'Рим',
+    'CAIRO': 'Каир'
+}
+
 ERR_MESSAGE_TEMPLATE = "Something wrong. Please contact with mentor."
 
 MIN_MAJOR_PYTHON_VER = 3
 MIN_MINOR_PYTHON_VER = 9
+
+HOURS_RANGE = (9, 19)
+GOOD_CONDITIONS = ('clear', 'partly-cloudy', 'cloudy', 'overcast')
+
+CSV_FILE_RELATIVE_PATH = 'result.csv'
 
 
 def check_python_version():
