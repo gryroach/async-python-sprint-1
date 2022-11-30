@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional
 
 from api_client import YandexWeatherAPI
 from utils import (
-    HOURS_RANGE, GOOD_CONDITIONS, CITIES_DESCRIPTION_MAP, CSV_FILE_PATH
+    HOURS_RANGE, GOOD_CONDITIONS, CITIES_DESCRIPTION_MAP, CSV_FILE_RELATIVE_PATH
 )
 
 
@@ -17,15 +17,17 @@ class DataFetchingTask:
         self.cities_urls = cities_urls
 
     def start_threads(self) -> List[Tuple[str, Dict]]:
-        """Return city name and raw data from YandexWeatherAPI"""
+        """Запускает пул потоков для получения данных о погоде"""
         with ThreadPoolExecutor(max_workers=8) as pool:
             data_generator = pool.map(
                 self.get_data, self.cities_urls.keys(), chunksize=4
             )
+        logging.info('Получены данные о погоде')
         return list(data_generator)
 
     @staticmethod
     def get_data(city: str) -> Tuple[str, Optional[Dict]]:
+        """Возвращает название города и сырые данные из YandexWeatherAPI"""
         try:
             return city, YandexWeatherAPI().get_forecasting(city)
         except Exception as er:
@@ -41,10 +43,13 @@ class DataCalculationTask:
 
     def calculate_data(self):
         """Обработать данные погоды для всех городов"""
+        logging.info('Начало расчетов данных о погоде')
         if not self.raw_data:
+            logging.warning('Нет данных для расчета!')
             return []
         with Pool(processes=4) as pool:
             poll_map_iterator = pool.map(self.get_forecast_data, self.raw_data)
+        logging.info('Данные расчитаны')
         return list(poll_map_iterator)
 
     @staticmethod
@@ -76,6 +81,7 @@ class DataCalculationTask:
         Получить средние значения температуры и часов без осадков за весь период
         """
         if not city_data:
+            logging.warning('Невозможно посчитать средние значения. Нет данных')
             return None, None
 
         good_conditions_hours = 0
@@ -99,7 +105,8 @@ class DataCalculationTask:
             'city': raw_city_data[0],
             'data': dict()
         }
-        if not raw_city_data or not raw_city_data[1]:
+        if not raw_city_data[1]:
+            logging.warning(f'Нет данных для города {raw_city_data[0]}!')
             return forecasts_data
         for forecast in raw_city_data[1]['forecasts']:
             average_temp, good_condition_hours = self.get_data_per_day(
@@ -126,12 +133,14 @@ class DataAggregationTask:
         raw_data = DataFetchingTask(self.cities_urls).start_threads()
         forecasts_data = DataCalculationTask(raw_data).calculate_data()
         if not forecasts_data or len(forecasts_data) == 0:
+            logging.warning('Агрегированные данные пусты')
             return None
         return self.replace_city_name(forecasts_data)
 
     @staticmethod
     def replace_city_name(data: List[Dict]) -> List[Dict]:
         """Заменить названия городов в соответствии с настройками"""
+        logging.info('Замена названий городов')
         for forecast in data:
             forecast['city'] = CITIES_DESCRIPTION_MAP.get(
                 forecast['city'], forecast['city']
@@ -145,6 +154,7 @@ class DataAnalyzingTask:
 
     def analyze_data(self) -> None:
         """Провести анализ погоды в городах и записать данные в csv-файл"""
+        logging.info('Начало анализа данных о погоде')
         if not self.data:
             print('Данные не предоставлены, анализ остановлен')
             return
@@ -153,6 +163,7 @@ class DataAnalyzingTask:
 
     def set_rating_for_city(self) -> None:
         """Добавить данные рейтинга городов"""
+        logging.info('Формирование рейтинга городов')
         intermediate_data = []
         for city in self.data:
             try:
@@ -181,12 +192,14 @@ class DataAnalyzingTask:
         Создать csv-файл с данными о температуре, часах без осадков
         и рейтинге городов
         """
+        logging.info('Создание CSV-файла с данными анализа')
         head = self.get_csv_head()
-        with open(CSV_FILE_PATH, 'w') as csv_file:
+        with open(CSV_FILE_RELATIVE_PATH, 'w') as csv_file:
             writer = csv.DictWriter(csv_file, delimiter=',', fieldnames=head)
             writer.writerow({column: column for column in head})
             for city in self.data:
                 if not city['data']:
+                    logging.warning('Нет данных для записи в файл')
                     continue
                 temp_row = {
                     'Город/день': city['city'],

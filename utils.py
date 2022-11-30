@@ -42,7 +42,7 @@ MIN_MINOR_PYTHON_VER = 9
 HOURS_RANGE = (9, 19)
 GOOD_CONDITIONS = ('clear', 'partly-cloudy', 'cloudy', 'overcast')
 
-CSV_FILE_PATH = 'result.csv'
+CSV_FILE_RELATIVE_PATH = 'result.csv'
 
 
 def check_python_version():
