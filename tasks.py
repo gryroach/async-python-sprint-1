@@ -67,14 +67,16 @@ class DataCalculationTask:
         """
         Получить средние значения температуры и часов без осадков за весь период
         """
-        good_conditions_days = 0
+        good_conditions_hours = 0
         average_temp = 0
         for day in city_data.values():
             average_temp += day[0]
-            good_conditions_days += day[1]
+            good_conditions_hours += day[1]
         average_temp /= len(city_data.values())
         average_temp = int(round(average_temp, 0))
-        return average_temp, good_conditions_days
+        good_conditions_hours /= len(city_data.values())
+        good_conditions_hours = int(round(good_conditions_hours, 0))
+        return average_temp, good_conditions_hours
 
     def get_forecast_data(self, raw_data: Tuple[str, Dict]) -> dict:
         """
