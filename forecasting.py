@@ -13,16 +13,21 @@ def forecast_weather():
     """
     Анализ погодных условий по городам
     """
-    logging.info('Старт анализа погодных условий')
+    logging.info('Start of weather analysis')
     start = time.time()
     data = DataAggregationTask(CITIES).aggregate_data()
-    DataAnalyzingTask(data).analyze_data()
+    best_weather_cities = DataAnalyzingTask(data).analyze_data()
     delta = time.time() - start
+    logging.info(f'Analysis completed. Execution time - {delta:.2f}s')
     print(
-        f'Анализ погодных условий окончен. CSV-файл создан по адресу: '
+        'Анализ погодных условий окончен. '
+        'Наиболее благоприятные для поездки города: '
+        f'{", ".join(best_weather_cities)}.'
+    )
+    print(
+        'CSV-файл с анализом создан по адресу: '
         f'{pathlib.Path().resolve().joinpath(CSV_FILE_RELATIVE_PATH)}'
     )
-    logging.info(f'Анализ окончен. Время выполнения - {delta:.2f}s')
 
 
 if __name__ == "__main__":
